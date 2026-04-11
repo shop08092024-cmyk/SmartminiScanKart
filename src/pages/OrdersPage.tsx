@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useStore, Order } from "@/store/useStore";
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { downloadInvoice } from "@/lib/invoiceGenerator";
 import { useShopProfile } from "@/context/ShopProfileContext";
 
@@ -41,6 +41,7 @@ function OrderDetailModal({ order, open, onClose }: { order: Order; open: boolea
             <Receipt className="h-5 w-5 text-primary" />
             {order.orderNumber}
           </DialogTitle>
+          <DialogDescription>Order details and summary</DialogDescription>
         </DialogHeader>
 
         <div className="rounded-xl bg-secondary/50 p-3.5 space-y-1.5 text-sm">

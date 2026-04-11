@@ -7,7 +7,7 @@ import { useStore } from "@/store/useStore";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import { toast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 const playBeep = (success = true) => {
   try {
@@ -155,7 +155,10 @@ const ScanPage = () => {
       {/* Quantity Dialog */}
       <Dialog open={quantityDialog} onOpenChange={setQuantityDialog}>
         <DialogContent className="max-w-xs rounded-2xl">
-          <DialogHeader><DialogTitle className="text-lg">Add to Cart</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle className="text-lg">Add to Cart</DialogTitle>
+            <DialogDescription>Select the quantity you want to add</DialogDescription>
+          </DialogHeader>
           {scannedProduct && (
             <div className="space-y-4">
               <div className="rounded-2xl bg-secondary/60 p-4 text-center">

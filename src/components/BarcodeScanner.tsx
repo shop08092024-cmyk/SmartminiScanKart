@@ -24,8 +24,12 @@ const BarcodeScanner = ({ onScan, onClose }: BarcodeScannerProps) => {
 
     scanner
       .start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 250, height: 150 } },
+        {
+          facingMode: "environment",
+          width: { ideal: 1920 },  // Request HD resolution
+          height: { ideal: 1080 },
+        },
+        { fps: 15, qrbox: { width: 300, height: 200 } },
         (decodedText) => {
           if (hasScannedRef.current) return;
           hasScannedRef.current = true;

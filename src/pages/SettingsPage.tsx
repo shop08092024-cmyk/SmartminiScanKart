@@ -12,7 +12,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useSubscription } from "@/context/SubscriptionContext";
 import { useShopProfile } from "@/context/ShopProfileContext";
 import { toast } from "@/hooks/use-toast";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 const planIcons: Record<string, React.ElementType> = { free: Zap, starter: Star, pro: Crown };
 const planColors: Record<string, string> = {
@@ -382,6 +382,7 @@ const SettingsPage = () => {
         <DialogContent className="max-w-sm rounded-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{activeModal ? modalTitles[activeModal] : ""}</DialogTitle>
+            <DialogDescription>Manage your {activeModal ? modalTitles[activeModal].toLowerCase() : "settings"}</DialogDescription>
           </DialogHeader>
           {activeModal === "shop" && <ShopProfileForm onClose={() => setActiveModal(null)} />}
           {activeModal === "notifications" && <NotificationSettings onClose={() => setActiveModal(null)} />}

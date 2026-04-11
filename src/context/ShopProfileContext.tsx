@@ -64,7 +64,7 @@ export function ShopProfileProvider({ children }: { children: ReactNode }) {
         .from("shop_profiles")
         .select("*")
         .eq("user_id", user.id)
-        .single();
+        .maybeSingle();
       if (data) {
         setProfile({
           id: data.id,

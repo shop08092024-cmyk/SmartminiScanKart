@@ -100,23 +100,29 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     if (!user) { setLoading(false); return; }
     setLoading(true);
 
-    const [{ data: plansData }, { data: subData }, { data: paymentsData }] = await Promise.all([
-      supabase.from("plans").select("*").order("price_monthly"),
-      supabase.from("subscriptions").select("*").eq("user_id", user.id).single(),
-      supabase.from("payment_history").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(20),
-    ]);
+    try {
+      const [{ data: plansData }, { data: subData }, { data: paymentsData }] = await Promise.all([
+        supabase.from("plans").select("*").order("price_monthly"),
+        supabase.from("subscriptions").select("*").eq("user_id", user.id).maybeSingle(),
+        supabase.from("payment_history").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(20),
+      ]);
 
-    if (plansData && plansData.length > 0) {
-      const parsedPlans: Plan[] = plansData.map(p => ({
-        ...p,
-        features: Array.isArray(p.features) ? p.features : JSON.parse(p.features as string),
-      }));
-      setPlans(parsedPlans);
+      if (plansData && plansData.length > 0) {
+        const parsedPlans: Plan[] = plansData.map(p => ({
+          ...p,
+          features: Array.isArray(p.features) ? p.features : JSON.parse(p.features as string),
+        }));
+        setPlans(parsedPlans);
+      }
+      // else keep DEFAULT_PLANS
+
+      setSubscription(subData ?? null);
+      setPaymentHistory(paymentsData ?? []);
+    } catch (error) {
+      console.error("Error fetching subscription data:", error);
+      setSubscription(null);
+      setPaymentHistory([]);
     }
-    // else keep DEFAULT_PLANS
-
-    setSubscription(subData ?? null);
-    setPaymentHistory(paymentsData ?? []);
     setLoading(false);
   }, [user]);
 

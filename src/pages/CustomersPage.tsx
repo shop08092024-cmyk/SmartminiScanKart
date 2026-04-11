@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useStore } from "@/store/useStore";
 import { toast } from "@/hooks/use-toast";
 
@@ -95,7 +95,10 @@ const CustomersPage = () => {
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-sm rounded-2xl">
-          <DialogHeader><DialogTitle className="text-lg">Add Customer</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle className="text-lg">Add Customer</DialogTitle>
+            <DialogDescription>Add a new customer to your database</DialogDescription>
+          </DialogHeader>
           <div className="space-y-3">
             <div className="relative">
               <User className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />

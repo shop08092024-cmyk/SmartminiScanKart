@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useStore, Product } from "@/store/useStore";
 import BarcodeScanner from "@/components/BarcodeScanner";
@@ -217,6 +217,7 @@ const ProductsPage = () => {
             <DialogTitle className="text-lg flex items-center gap-2">
               <Package className="h-5 w-5 text-primary" /> Product Found
             </DialogTitle>
+            <DialogDescription>Add stock to this existing product or edit its details</DialogDescription>
           </DialogHeader>
           {existingProductBarcode && (
             <div className="space-y-4">
@@ -283,7 +284,10 @@ const ProductsPage = () => {
       {/* Delete Confirmation */}
       <Dialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
         <DialogContent className="max-w-xs rounded-2xl">
-          <DialogHeader><DialogTitle>Delete Product?</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Delete Product?</DialogTitle>
+            <DialogDescription>This action cannot be undone and will permanently delete this product.</DialogDescription>
+          </DialogHeader>
           <p className="text-sm text-muted-foreground">This action cannot be undone.</p>
           <div className="flex gap-2 mt-2">
             <Button variant="outline" className="flex-1 rounded-xl" onClick={() => setDeleteConfirm(null)}>Cancel</Button>
@@ -297,6 +301,7 @@ const ProductsPage = () => {
         <DialogContent className="max-w-sm rounded-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-lg">{editingId ? "Edit Product" : "Add Product"}</DialogTitle>
+            <DialogDescription>{editingId ? "Update product details" : "Add a new product to your inventory"}</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <Input placeholder="Product name *" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="h-11 rounded-xl" />
