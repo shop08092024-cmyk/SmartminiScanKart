@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import {
   ShoppingCart, Plus, Minus, Trash2, CreditCard, ScanBarcode, Search,
-  Tag, Smartphone, Banknote, Zap, CheckCircle, Download, ArrowRight
+  Tag, Smartphone, Banknote, CheckCircle, Download, ArrowRight, QrCode
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,9 +14,6 @@ import BarcodeScanner from "@/components/BarcodeScanner";
 import { downloadInvoice } from "@/lib/invoiceGenerator";
 import { useShopProfile } from "@/context/ShopProfileContext";
 import { Product } from "@/store/useStore";
-
-declare global { interface Window { Razorpay: unknown; } }
-const RAZORPAY_KEY = "rzp_live_SWWyQlxsSLcyD0";
 
 const playBeep = (success = true) => {
   try {
@@ -31,14 +28,16 @@ const playBeep = (success = true) => {
   } catch (_) {}
 };
 
-const loadRazorpay = (): Promise<boolean> => new Promise((resolve) => {
-  if ((window as { Razorpay?: unknown }).Razorpay) { resolve(true); return; }
-  const script = document.createElement("script");
-  script.src = "https://checkout.razorpay.com/v1/checkout.js";
-  script.onload = () => resolve(true);
-  script.onerror = () => resolve(false);
-  document.body.appendChild(script);
-});
+// Generate UPI Deep Link for QR Code
+const generateUPIDeepLink = (upiId: string, amount: number, shopName: string) => {
+  const amountInPaisa = Math.round(amount * 100);
+  return `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(shopName)}&am=${amountInPaisa / 100}&tn=SmartMiniScanKart Order`;
+};
+
+// Generate QR Code URL using free API
+const generateQRCode = (upiLink: string): string => {
+  return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(upiLink)}`;
+};
 
 function ProductSearchDropdown({ onSelect }: { onSelect: (p: Product) => void }) {
   const { products } = useStore();
@@ -161,43 +160,37 @@ const CartPage = () => {
   const [quantity, setQuantity] = useState(1);
   const [processing, setProcessing] = useState(false);
   const [completedOrder, setCompletedOrder] = useState<Order | null>(null);
+  const [upiQRDialog, setUpiQRDialog] = useState(false);
+  const [upiQRUrl, setUpiQRUrl] = useState("");
   const navigate = useNavigate();
 
   const subtotal = cart.reduce((s, c) => s + c.product.price * c.quantity, 0);
   const tax = cart.reduce((s, c) => s + (c.product.price * c.quantity * c.product.taxPercent) / 100, 0);
   const total = subtotal + tax - discount;
 
-  useEffect(() => { loadRazorpay(); }, []);
+  const handleUPIPayment = async () => {
+    if (!profile.upiId) {
+      toast({ title: "UPI ID not configured", description: "Please add your UPI ID in Shop Settings", variant: "destructive" });
+      return;
+    }
+    const upiLink = generateUPIDeepLink(profile.upiId, total, profile.shopName || "SmartMiniScanKart");
+    const qrUrl = generateQRCode(upiLink);
+    setUpiQRUrl(qrUrl);
+    setUpiQRDialog(true);
+  };
 
-  const handleRazorpayPayment = async () => {
+  const completeUPIOrder = async () => {
     setProcessing(true);
-    const loaded = await loadRazorpay();
-    if (!loaded) { toast({ title: "Razorpay unavailable", variant: "destructive" }); setProcessing(false); return; }
-    const rzpWindow = window as { Razorpay?: new (opts: unknown) => { open: () => void } };
-    if (!rzpWindow.Razorpay) { setProcessing(false); return; }
-    const options = {
-      key: RAZORPAY_KEY,
-      amount: Math.round(total * 100),
-      currency: "INR",
-      name: "ShopScan POS",
-      description: `Order — ${cart.length} items`,
-      prefill: { name: customerName || undefined, contact: customerPhone || undefined },
-      theme: { color: "#6366f1" },
-      handler: async (response: { razorpay_payment_id: string; razorpay_order_id?: string }) => {
-        try {
-          const order = await checkout("Razorpay", discount, customerName || undefined, customerPhone || undefined, response.razorpay_order_id, response.razorpay_payment_id);
-          playBeep(true);
-          setCheckoutOpen(false);
-          setDiscount(0); setCustomerName(""); setCustomerPhone("");
-          setCompletedOrder(order);
-        } catch (e) {
-          toast({ title: "Order save failed", description: String(e), variant: "destructive" });
-          setProcessing(false);
-        }
-      },
-      modal: { ondismiss: () => { setProcessing(false); toast({ title: "Payment cancelled", variant: "destructive" }); } },
-    };
-    new rzpWindow.Razorpay(options).open();
+    try {
+      const order = await checkout("UPI", discount, customerName || undefined, customerPhone || undefined);
+      playBeep(true);
+      setUpiQRDialog(false);
+      setCheckoutOpen(false);
+      setDiscount(0); setCustomerName(""); setCustomerPhone("");
+      setCompletedOrder(order);
+    } catch (e) {
+      toast({ title: "Order save failed", description: String(e), variant: "destructive" });
+    } finally { setProcessing(false); }
   };
 
   const handleCashUpiCheckout = async () => {
@@ -214,7 +207,7 @@ const CartPage = () => {
   };
 
   const handleCheckout = () => {
-    if (paymentMethod === "Razorpay") handleRazorpayPayment();
+    if (paymentMethod === "UPI") handleUPIPayment();
     else handleCashUpiCheckout();
   };
 
@@ -384,12 +377,11 @@ const CartPage = () => {
           <div className="space-y-4">
             <div>
               <label className="mb-2 block text-xs font-semibold text-muted-foreground uppercase tracking-wider">Payment Method</label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 {[
                   { id: "Cash", label: "Cash", icon: <Banknote className="h-4 w-4" /> },
                   { id: "UPI", label: "UPI", icon: <Smartphone className="h-4 w-4" /> },
                   { id: "Card", label: "Card", icon: <CreditCard className="h-4 w-4" /> },
-                  { id: "Razorpay", label: "Razorpay", icon: <Zap className="h-4 w-4" /> },
                 ].map(({ id, label, icon }) => (
                   <button key={id} onClick={() => setPaymentMethod(id)}
                     className={`flex items-center gap-2 rounded-xl border-2 px-3.5 py-3 text-sm font-semibold transition-all ${paymentMethod === id ? "border-primary bg-primary/5 text-primary" : "border-border bg-secondary/30 text-muted-foreground hover:border-primary/40"}`}>
@@ -413,7 +405,46 @@ const CartPage = () => {
               </div>
             </div>
             <Button className="h-12 w-full rounded-xl gradient-primary shadow-glow-primary" disabled={processing || total <= 0} onClick={handleCheckout}>
-              {processing ? "Processing…" : paymentMethod === "Razorpay" ? `Pay ₹${total.toFixed(2)} via Razorpay` : `Complete Order — ₹${total.toFixed(2)}`}
+              {processing ? "Processing…" : `Complete Order — ₹${total.toFixed(2)}`}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* UPI QR Code Dialog */}
+      <Dialog open={upiQRDialog} onOpenChange={setUpiQRDialog}>
+        <DialogContent className="max-w-sm rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <QrCode className="h-5 w-5 text-primary" />
+              UPI Payment
+            </DialogTitle>
+            <DialogDescription>Scan this QR code with Google Pay or any UPI app</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex justify-center p-6 bg-secondary/30 rounded-2xl">
+              <img src={upiQRUrl} alt="UPI QR Code" className="h-64 w-64" />
+            </div>
+            <div className="rounded-xl bg-primary/5 p-4 space-y-2">
+              <p className="text-sm text-muted-foreground">Amount to Pay</p>
+              <p className="text-2xl font-bold text-primary">₹{total.toFixed(2)}</p>
+            </div>
+            <p className="text-xs text-center text-muted-foreground">
+              Customer can scan this QR code from Google Pay, PhonePe, or any UPI app to complete payment
+            </p>
+            <Button 
+              className="h-12 w-full rounded-xl gradient-primary" 
+              onClick={completeUPIOrder}
+              disabled={processing}
+            >
+              {processing ? "Processing..." : "Confirm Payment Received"}
+            </Button>
+            <Button 
+              variant="outline" 
+              className="h-11 w-full rounded-xl" 
+              onClick={() => setUpiQRDialog(false)}
+            >
+              Cancel
             </Button>
           </div>
         </DialogContent>
