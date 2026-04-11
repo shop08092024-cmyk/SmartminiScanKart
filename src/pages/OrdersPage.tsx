@@ -1,4 +1,4 @@
-import { ClipboardList, Receipt, CreditCard, Smartphone, Banknote, CheckCircle2, Search, Download, MessageCircle } from "lucide-react";
+import { ClipboardList, Receipt, CreditCard, Smartphone, Banknote, CheckCircle2, Search, Download, MessageCircle, ArrowLeft } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -52,7 +52,15 @@ function OrderDetailModal({ order, open, onClose }: { order: Order; open: boolea
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-sm rounded-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-sm rounded-2xl max-h-[85vh] overflow-y-auto relative">
+        {/* Back Button */}
+        <button
+          onClick={onClose}
+          className="absolute top-3 left-3 p-2 rounded-full hover:bg-secondary transition-colors focus:outline-none"
+          aria-label="Back"
+        >
+          <ArrowLeft className="h-5 w-5 text-muted-foreground" />
+        </button>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-lg">
             <Receipt className="h-5 w-5 text-primary" />
