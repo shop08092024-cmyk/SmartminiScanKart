@@ -22,41 +22,49 @@ const BarcodeScanner = ({ onScan, onClose }: BarcodeScannerProps) => {
     const scanner = new Html5Qrcode(scannerId);
     scannerRef.current = scanner;
 
-    scanner
-      .start(
-        {
-          facingMode: "environment",
-          width: { ideal: 1920 },  // Request HD resolution
-          height: { ideal: 1080 },
-        },
-        { fps: 15, qrbox: { width: 300, height: 200 } },
-        (decodedText) => {
-          if (hasScannedRef.current) return;
-          hasScannedRef.current = true;
+    const startScanner = (facingMode: string) => {
+      scanner
+        .start(
+          {
+            facingMode,
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+          },
+          { fps: 15, qrbox: { width: 300, height: 200 } },
+          (decodedText) => {
+            if (hasScannedRef.current) return;
+            hasScannedRef.current = true;
 
-          // Beep sound
-          try {
-            const ctx = new AudioContext();
-            const osc = ctx.createOscillator();
-            osc.frequency.value = 1200;
-            osc.connect(ctx.destination);
-            osc.start();
-            setTimeout(() => { osc.stop(); ctx.close(); }, 150);
-          } catch (_) {}
+            // Beep sound
+            try {
+              const ctx = new AudioContext();
+              const osc = ctx.createOscillator();
+              osc.frequency.value = 1200;
+              osc.connect(ctx.destination);
+              osc.start();
+              setTimeout(() => { osc.stop(); ctx.close(); }, 150);
+            } catch (_) {}
 
-          scanner.stop().then(() => {
-            onScanRef.current(decodedText);
-          }).catch(() => {
-            // Even if stop fails, still fire callback
-            onScanRef.current(decodedText);
-          });
-        },
-        () => {}
-      )
-      .catch((err) => {
-        setError("Camera access denied. Please allow camera permissions.");
-        console.error(err);
-      });
+            scanner.stop().then(() => {
+              onScanRef.current(decodedText);
+            }).catch(() => {
+              onScanRef.current(decodedText);
+            });
+          },
+          () => {}
+        )
+        .catch((err) => {
+          if (facingMode === "environment") {
+            // Retry with front camera as fallback
+            startScanner("user");
+          } else {
+            setError("Camera access denied. Please allow camera permissions.");
+            console.error(err);
+          }
+        });
+    };
+
+    startScanner("environment");
 
     return () => {
       if (scanner.isScanning) {

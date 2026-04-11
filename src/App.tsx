@@ -26,8 +26,16 @@ const queryClient = new QueryClient();
 
 function DataLoader({ children }: { children: React.ReactNode }) {
   const { session, loading } = useAuth();
+  // Use stable reference: Zustand action functions don't change between renders
   const fetchAll = useStore((s) => s.fetchAll);
-  useEffect(() => { if (session) fetchAll(); }, [session, fetchAll]);
+
+  useEffect(() => {
+    if (session) {
+      fetchAll().catch((err) => console.error("Initial data fetch failed:", err));
+    }
+  // fetchAll is a stable Zustand action — safe to include without causing loops
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user?.id]);
   
   // Show loading state while auth is initializing
   if (loading) {

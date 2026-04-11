@@ -283,11 +283,23 @@ export const useStore = create<AppState>((set, get) => ({
   checkout: async (paymentMethod, discount, customerName, customerPhone, razorpayOrderId, razorpayPaymentId) => {
     const user_id = await getUserId();
     const s = get();
+
+    if (s.cart.length === 0) throw new Error("Cart is empty");
+
+    // Validate stock availability before hitting the DB
+    for (const c of s.cart) {
+      if (c.quantity > c.product.stock) {
+        throw new Error(`Insufficient stock for "${c.product.name}". Only ${c.product.stock} left.`);
+      }
+    }
+
     const tax = s.cart.reduce(
       (sum, c) => sum + (c.product.price * c.quantity * c.product.taxPercent) / 100, 0
     );
     const subtotal = s.cart.reduce((sum, c) => sum + c.product.price * c.quantity, 0);
-    const total = subtotal + tax - discount;
+    // Ensure discount never makes total negative
+    const safeDiscount = Math.min(discount, subtotal + tax);
+    const total = Math.max(0, subtotal + tax - safeDiscount);
     const orderNumber = generateOrderNumber(s.orderCounter);
 
     const { data: order, error: orderError } = await supabase
@@ -297,7 +309,7 @@ export const useStore = create<AppState>((set, get) => ({
         order_number: orderNumber,
         total,
         tax,
-        discount,
+        discount: safeDiscount,
         payment_method: paymentMethod,
         payment_status: "paid",
         razorpay_order_id: razorpayOrderId ?? null,
@@ -355,11 +367,38 @@ export const useStore = create<AppState>((set, get) => ({
       }
     }
 
-    await get().fetchAll();
+    // Build the complete order object from local cart data — avoids race condition
+    // where fetchAll() state update hasn't propagated yet when we read get().orders
+    const builtItems: OrderItem[] = s.cart.map((c) => ({
+      productId: c.product.id,
+      productName: c.product.name,
+      quantity: c.quantity,
+      unitPrice: c.product.price,
+      taxPercent: c.product.taxPercent,
+      lineTotal: c.product.price * c.quantity,
+    }));
+    const builtOrder: Order = {
+      id: order.id,
+      orderNumber,
+      items: builtItems,
+      subtotal,
+      total,
+      tax,
+      discount: safeDiscount,
+      paymentMethod,
+      paymentStatus: "paid",
+      razorpayOrderId: razorpayOrderId ?? undefined,
+      razorpayPaymentId: razorpayPaymentId ?? undefined,
+      customerName: customerName ?? undefined,
+      customerPhone: customerPhone ?? undefined,
+      createdAt: order.created_at ?? new Date().toISOString(),
+    };
+
+    // Refresh store data in background (don't await — we already have what we need)
+    get().fetchAll();
     set({ cart: [], orderCounter: s.orderCounter + 1 });
 
-    const createdOrder = get().orders.find((o) => o.orderNumber === orderNumber);
-    return createdOrder ?? toOrder({ ...order, order_items: [] });
+    return builtOrder;
   },
 
   addCustomer: async (c) => {

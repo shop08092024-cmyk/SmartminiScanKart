@@ -18,15 +18,25 @@ const CustomersPage = () => {
     c.name.toLowerCase().includes(search.toLowerCase()) || c.phone.includes(search)
   );
 
-  const handleAdd = () => {
-    if (!form.name || !form.phone) {
+  const handleAdd = async () => {
+    if (!form.name.trim() || !form.phone.trim()) {
       toast({ title: "Name and phone required", variant: "destructive" });
       return;
     }
-    addCustomer(form);
-    setForm({ name: "", phone: "", email: "" });
-    setDialogOpen(false);
-    toast({ title: "Customer added ✓" });
+    // Check for duplicate phone
+    const duplicate = customers.find((c) => c.phone === form.phone.trim());
+    if (duplicate) {
+      toast({ title: "Customer already exists", description: `${duplicate.name} has this phone number`, variant: "destructive" });
+      return;
+    }
+    try {
+      await addCustomer({ name: form.name.trim(), phone: form.phone.trim(), email: form.email.trim() || undefined });
+      setForm({ name: "", phone: "", email: "" });
+      setDialogOpen(false);
+      toast({ title: "Customer added ✓" });
+    } catch (e) {
+      toast({ title: "Failed to add customer", description: e instanceof Error ? e.message : "Unknown error", variant: "destructive" });
+    }
   };
 
   const timeAgo = (dateStr: string) => {

@@ -261,10 +261,17 @@ export async function shareInvoiceViaWhatsApp(order: Order, shop: ShopProfile) {
       throw new Error("Customer phone number not available");
     }
 
-    // Format phone number (remove spaces, +, - and add country code if needed)
-    let formattedPhone = phone.replace(/[\s\-+]/g, "");
-    if (!formattedPhone.startsWith("91") && formattedPhone.length === 10) {
+    // Normalize: strip all non-digits
+    let formattedPhone = phone.replace(/\D/g, "");
+    // Handle various formats: 10-digit, 91XXXXXXXXXX (12-digit), 0XXXXXXXXXX (11-digit)
+    if (formattedPhone.length === 10) {
       formattedPhone = "91" + formattedPhone;
+    } else if (formattedPhone.length === 11 && formattedPhone.startsWith("0")) {
+      formattedPhone = "91" + formattedPhone.slice(1);
+    } else if (formattedPhone.length === 12 && formattedPhone.startsWith("91")) {
+      // Already correct
+    } else if (formattedPhone.length < 10) {
+      throw new Error("Invalid phone number — must be at least 10 digits");
     }
 
     // Open WhatsApp with message

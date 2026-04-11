@@ -437,7 +437,7 @@ const CartPage = () => {
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-semibold text-muted-foreground">Discount (₹)</label>
-              <Input type="number" value={discount || ""} placeholder="0" onChange={e => setDiscount(Math.max(0, Math.min(subtotal, +e.target.value)))} className="h-11 rounded-xl" />
+              <Input type="number" value={discount || ""} placeholder="0" onChange={e => setDiscount(Math.max(0, Math.min(subtotal + tax, +e.target.value)))} className="h-11 rounded-xl" />
             </div>
             <Input placeholder="Customer name (optional)" value={customerName} onChange={e => setCustomerName(e.target.value)} className="h-11 rounded-xl" />
             <Input placeholder="Customer phone (optional)" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} className="h-11 rounded-xl" />

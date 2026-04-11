@@ -1,4 +1,4 @@
-import { ClipboardList, Receipt, CreditCard, Smartphone, Banknote, CheckCircle2, Search, Download, MessageCircle, ArrowLeft } from "lucide-react";
+import { ClipboardList, Receipt, CreditCard, Smartphone, Banknote, CheckCircle2, Search, Download, MessageCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { useStore, Order } from "@/store/useStore";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { downloadInvoice, downloadInvoicePDF, shareInvoiceViaWhatsApp, generateInvoiceHTML } from "@/lib/invoiceGenerator";
+import { downloadInvoicePDF, shareInvoiceViaWhatsApp, generateInvoiceHTML } from "@/lib/invoiceGenerator";
 import { useShopProfile } from "@/context/ShopProfileContext";
+import { toast } from "@/hooks/use-toast";
 
 const paymentIcon = (method: string) => {
   if (method === "UPI") return <Smartphone className="h-3.5 w-3.5" />;
@@ -41,10 +42,10 @@ function OrderDetailModal({ order, open, onClose }: { order: Order; open: boolea
     try {
       setIsShareLoading(true);
       await shareInvoiceViaWhatsApp(order, profile);
-      // toast.success("WhatsApp opened! Remember to attach the invoice PDF manually.");
+      toast({ title: "WhatsApp opened!", description: "Invoice details sent. Attach the PDF manually if needed." });
     } catch (error) {
       console.error("Error:", error);
-      // toast.error(error instanceof Error ? error.message : "Failed to share via WhatsApp");
+      toast({ title: "Failed to share", description: error instanceof Error ? error.message : "Failed to share via WhatsApp", variant: "destructive" });
     } finally {
       setIsShareLoading(false);
     }
@@ -52,15 +53,7 @@ function OrderDetailModal({ order, open, onClose }: { order: Order; open: boolea
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-sm rounded-2xl max-h-[85vh] overflow-y-auto relative">
-        {/* Back Button */}
-        <button
-          onClick={onClose}
-          className="absolute top-3 left-3 p-2 rounded-full hover:bg-secondary transition-colors focus:outline-none"
-          aria-label="Back"
-        >
-          <ArrowLeft className="h-5 w-5 text-muted-foreground" />
-        </button>
+      <DialogContent className="max-w-sm rounded-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-lg">
             <Receipt className="h-5 w-5 text-primary" />

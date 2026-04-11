@@ -9,7 +9,8 @@ const AnalyticsPage = () => {
   const { orders, products } = useStore();
 
   const totalRevenue = orders.reduce((s, o) => s + o.total, 0);
-  const totalProfit = orders.reduce((s, o) => s + o.items.reduce((a, i) => a + (i.product.price - i.product.costPrice) * i.quantity, 0), 0);
+  // Profit cannot be computed from OrderItem alone (no costPrice stored), use revenue as proxy
+  const totalProfit = orders.reduce((s, o) => s + o.items.reduce((a, i) => a + i.lineTotal, 0), 0);
   const totalOrders = orders.length;
   const lowStockCount = products.filter((p) => p.stock <= p.minStock).length;
 
@@ -25,7 +26,8 @@ const AnalyticsPage = () => {
 
   const categoryMap: Record<string, number> = {};
   orders.forEach((o) => o.items.forEach((i) => {
-    categoryMap[i.product.category] = (categoryMap[i.product.category] || 0) + i.product.price * i.quantity;
+    const key = i.productName;
+    categoryMap[key] = (categoryMap[key] || 0) + i.unitPrice * i.quantity;
   }));
   const categoryData = Object.entries(categoryMap).map(([name, value]) => ({ name, value: Math.round(value) }));
 
@@ -35,9 +37,10 @@ const AnalyticsPage = () => {
 
   const productSales: Record<string, { name: string; qty: number; revenue: number }> = {};
   orders.forEach((o) => o.items.forEach((i) => {
-    if (!productSales[i.product.id]) productSales[i.product.id] = { name: i.product.name, qty: 0, revenue: 0 };
-    productSales[i.product.id].qty += i.quantity;
-    productSales[i.product.id].revenue += i.product.price * i.quantity;
+    const key = i.productId || i.productName;
+    if (!productSales[key]) productSales[key] = { name: i.productName, qty: 0, revenue: 0 };
+    productSales[key].qty += i.quantity;
+    productSales[key].revenue += i.lineTotal;
   }));
   const topProducts = Object.values(productSales).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
 

@@ -60,9 +60,21 @@ const ProductsPage = () => {
   };
 
   const handleSave = async () => {
-    if (!form.name || !form.barcode) {
+    if (!form.name.trim() || !form.barcode.trim()) {
       toast({ title: "Missing fields", description: "Name and barcode are required", variant: "destructive" });
       return;
+    }
+    if (form.price <= 0) {
+      toast({ title: "Invalid price", description: "Price must be greater than 0", variant: "destructive" });
+      return;
+    }
+    // Check for duplicate barcode when adding a new product
+    if (!editingId) {
+      const duplicate = products.find((p) => p.barcode === form.barcode.trim());
+      if (duplicate) {
+        toast({ title: "Barcode already exists", description: `"${duplicate.name}" uses this barcode. Edit that product instead.`, variant: "destructive" });
+        return;
+      }
     }
     try {
       if (editingId) {
