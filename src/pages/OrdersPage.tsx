@@ -1,4 +1,4 @@
-import { ClipboardList, Receipt, CreditCard, Smartphone, Banknote, CheckCircle2, Search, Download } from "lucide-react";
+import { ClipboardList, Receipt, CreditCard, Smartphone, Banknote, CheckCircle2, Search, Download, MessageCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useStore, Order } from "@/store/useStore";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { downloadInvoice } from "@/lib/invoiceGenerator";
+import { downloadInvoice, downloadInvoicePDF, shareInvoiceViaWhatsApp, generateInvoiceHTML } from "@/lib/invoiceGenerator";
 import { useShopProfile } from "@/context/ShopProfileContext";
 
 const paymentIcon = (method: string) => {
@@ -26,13 +26,30 @@ const formatDate = (dateStr: string) => {
   const d = new Date(dateStr);
   return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 };
+
 const formatDateShort = (dateStr: string) => {
   const d = new Date(dateStr);
-  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 };
 
 function OrderDetailModal({ order, open, onClose }: { order: Order; open: boolean; onClose: () => void }) {
+    const [invoicePreviewOpen, setInvoicePreviewOpen] = useState(false);
   const { profile } = useShopProfile();
+  const [isShareLoading, setIsShareLoading] = useState(false);
+
+  const handleWhatsAppShare = async () => {
+    try {
+      setIsShareLoading(true);
+      await shareInvoiceViaWhatsApp(order, profile);
+      // toast.success("WhatsApp opened! Remember to attach the invoice PDF manually.");
+    } catch (error) {
+      console.error("Error:", error);
+      // toast.error(error instanceof Error ? error.message : "Failed to share via WhatsApp");
+    } finally {
+      setIsShareLoading(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-sm rounded-2xl max-h-[85vh] overflow-y-auto">
@@ -84,9 +101,35 @@ function OrderDetailModal({ order, open, onClose }: { order: Order; open: boolea
           <div className="flex justify-between border-t border-border/60 pt-2.5 text-base font-extrabold"><span>Total Paid</span><span className="text-primary">₹{order.total.toFixed(2)}</span></div>
         </div>
 
-        <Button className="w-full h-11 rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 text-white gap-2 font-semibold" onClick={() => downloadInvoice(order, profile)}>
-          <Download className="h-4 w-4" /> Download Invoice
-        </Button>
+        <div className="flex gap-2">
+          <Button className="flex-1 h-11 rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 text-white gap-2 font-semibold" onClick={() => setInvoicePreviewOpen(true)}>
+            <Download className="h-4 w-4" /> Invoice
+          </Button>
+          {order.customerPhone && (
+            <Button className="flex-1 h-11 rounded-xl bg-green-600 hover:bg-green-700 text-white gap-2 font-semibold disabled:opacity-50" onClick={handleWhatsAppShare} disabled={isShareLoading}>
+              <MessageCircle className="h-4 w-4" /> WhatsApp
+            </Button>
+          )}
+        </div>
+
+        {/* Invoice Preview Dialog */}
+        <Dialog open={invoicePreviewOpen} onOpenChange={setInvoicePreviewOpen}>
+          <DialogContent className="max-w-2xl w-full">
+            <DialogHeader>
+              <DialogTitle>Invoice Preview</DialogTitle>
+            </DialogHeader>
+            <iframe
+              title="Invoice Preview"
+              srcDoc={generateInvoiceHTML(order, profile)}
+              style={{ width: '100%', height: '70vh', border: 'none', borderRadius: 8, background: '#fff' }}
+            />
+            <div className="flex justify-end mt-4">
+              <Button onClick={() => downloadInvoicePDF(order, profile)}>
+                <Download className="h-4 w-4 mr-2" /> Download Invoice
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </DialogContent>
     </Dialog>
   );

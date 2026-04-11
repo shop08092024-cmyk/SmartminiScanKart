@@ -1,5 +1,6 @@
 import { Order } from "@/store/useStore";
 import { ShopProfile } from "@/context/ShopProfileContext";
+import html2pdf from "html2pdf.js";
 
 export function generateInvoiceHTML(order: Order, shop: ShopProfile): string {
   const date = new Date(order.createdAt);
@@ -20,10 +21,6 @@ export function generateInvoiceHTML(order: Order, shop: ShopProfile): string {
         <td style="padding:8px 6px;border-bottom:1px solid #f0f0f0;text-align:right;font-weight:600;">₹${item.lineTotal.toFixed(2)}</td>
       </tr>`;
   }).join("");
-
-  const qrUrl = shop.upiId
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=upi://pay?pa=${encodeURIComponent(shop.upiId)}&pn=${encodeURIComponent(shop.shopName)}&am=${order.total.toFixed(2)}&cu=INR&tn=${encodeURIComponent(order.orderNumber)}`
-    : "";
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -167,10 +164,6 @@ export function generateInvoiceHTML(order: Order, shop: ShopProfile): string {
         </div>
         ${shop.upiId ? `<div class="footer-sub">UPI: ${shop.upiId}</div>` : ""}
       </div>
-      ${qrUrl ? `<div style="text-align:center;">
-        <img src="${qrUrl}" width="70" height="70" alt="UPI QR" style="border-radius:6px;border:1px solid #e0e0e0;"/>
-        <div style="font-size:10px;color:#aaa;margin-top:3px;">Scan to Pay</div>
-      </div>` : ""}
     </div>
 
     <div style="text-align:center;padding:12px;font-size:10px;color:#ccc;border-top:1px solid #f0f0f0;">
@@ -194,4 +187,97 @@ export function downloadInvoice(order: Order, shop: ShopProfile) {
     a.click();
   }
   setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
+export async function generatePDF(order: Order, shop: ShopProfile): Promise<Blob> {
+  const html = generateInvoiceHTML(order, shop);
+  const element = document.createElement("div");
+  element.innerHTML = html;
+
+  return new Promise((resolve, reject) => {
+    const options = {
+      margin: 0,
+      filename: `${order.orderNumber}.pdf`,
+      image: { type: "jpeg", quality: 0.98 },
+      html2canvas: { scale: 2 },
+      jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+      pagebreak: { mode: ["avoid-all", "css", "legacy"] },
+    };
+
+    (html2pdf() as any)
+      .set(options)
+      .from(element)
+      .outputPdf("blob")
+      .then((pdf: Blob) => {
+        resolve(pdf);
+      })
+      .catch((err: Error) => {
+        reject(err);
+      });
+  });
+}
+
+export async function downloadInvoicePDF(order: Order, shop: ShopProfile) {
+  try {
+    const pdf = await generatePDF(order, shop);
+    const url = URL.createObjectURL(pdf);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${order.orderNumber}.pdf`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  } catch (error) {
+    console.error("Error downloading PDF:", error);
+    throw error;
+  }
+}
+
+export async function shareInvoiceViaWhatsApp(order: Order, shop: ShopProfile) {
+  try {
+    // Create a well-formatted WhatsApp message
+    const dateObj = new Date(order.createdAt);
+    const dateStr = dateObj.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+    const timeStr = dateObj.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+    const address = [shop.address, shop.city, shop.state ? shop.state : undefined, shop.pincode ? `– ${shop.pincode}` : undefined].filter(Boolean).join(", ");
+    const itemsList = order.items.map(item => `* ${item.productName} × ${item.quantity} — ₹${(item.unitPrice * item.quantity).toFixed(2)}`).join("\n");
+
+    const message =
+      `🧾 ORDER INVOICE\n\n` +
+      `🏪 Store: ${shop.shopName}\n` +
+      `📍 Address:\n${address}\n` +
+      (shop.phone ? `📞 Phone: ${shop.phone}\n` : "") +
+      `\n` +
+      `📄 Invoice No: ${order.orderNumber}\n` +
+      `💰 Amount Paid: ₹${order.total.toFixed(2)}\n` +
+      `📅 Date: ${dateStr}, ${timeStr}\n` +
+      `\n` +
+      `🛍️ Items Purchased:\n${itemsList}\n` +
+      `\n` +
+      `🙏 Thank you for shopping with us!\nWe appreciate your business`;
+
+    // Get customer phone number
+    const phone = order.customerPhone;
+    if (!phone) {
+      throw new Error("Customer phone number not available");
+    }
+
+    // Format phone number (remove spaces, +, - and add country code if needed)
+    let formattedPhone = phone.replace(/[\s\-+]/g, "");
+    if (!formattedPhone.startsWith("91") && formattedPhone.length === 10) {
+      formattedPhone = "91" + formattedPhone;
+    }
+
+    // Open WhatsApp with message
+    const encodedMessage = encodeURIComponent(message);
+    const whatsappUrl = `https://wa.me/${formattedPhone}?text=${encodedMessage}`;
+    window.open(whatsappUrl, "_blank");
+
+    return {
+      success: true,
+      message: "WhatsApp opened with invoice message.",
+    };
+  } catch (error) {
+    console.error("Error sharing invoice:", error);
+    throw error;
+  }
 }

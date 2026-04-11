@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import {
   ShoppingCart, Plus, Minus, Trash2, CreditCard, ScanBarcode, Search,
-  Tag, Smartphone, Banknote, CheckCircle, Download, ArrowRight, QrCode
+  Tag, Smartphone, Banknote, CheckCircle, Download, ArrowRight, MessageCircle
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { toast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import BarcodeScanner from "@/components/BarcodeScanner";
-import { downloadInvoice } from "@/lib/invoiceGenerator";
+import { downloadInvoice, downloadInvoicePDF, shareInvoiceViaWhatsApp } from "@/lib/invoiceGenerator";
 import { useShopProfile } from "@/context/ShopProfileContext";
 import { Product } from "@/store/useStore";
 
@@ -110,6 +110,21 @@ function OrderCompleteScreen({ order, onClose, onNewOrder }: {
   order: Order; onClose: () => void; onNewOrder: () => void;
 }) {
   const { profile } = useShopProfile();
+  const [isShareLoading, setIsShareLoading] = useState(false);
+
+  const handleWhatsAppShare = async () => {
+    try {
+      setIsShareLoading(true);
+      await shareInvoiceViaWhatsApp(order, profile);
+      toast.success("WhatsApp opened! Remember to attach the invoice PDF manually.");
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to share via WhatsApp");
+    } finally {
+      setIsShareLoading(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-background flex flex-col items-center justify-center p-6 animate-scale-in">
       <div className="w-full max-w-sm">
@@ -131,9 +146,14 @@ function OrderCompleteScreen({ order, onClose, onNewOrder }: {
           </CardContent>
         </Card>
         <div className="space-y-3">
-          <Button className="h-12 w-full rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold gap-2" onClick={() => downloadInvoice(order, profile)}>
-            <Download className="h-4 w-4" /> Download Invoice
+          <Button className="h-12 w-full rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold gap-2" onClick={() => downloadInvoicePDF(order, profile)}>
+            <Download className="h-4 w-4" /> Download Invoice PDF
           </Button>
+          {order.customerPhone && (
+            <Button className="h-12 w-full rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold gap-2 disabled:opacity-50" onClick={handleWhatsAppShare} disabled={isShareLoading}>
+              <MessageCircle className="h-4 w-4" /> {isShareLoading ? "Sending..." : "Send Invoice to WhatsApp"}
+            </Button>
+          )}
           <Button className="h-12 w-full rounded-xl gradient-primary shadow-glow-primary font-semibold gap-2" onClick={onNewOrder}>
             <ShoppingCart className="h-4 w-4" /> New Order
           </Button>
@@ -148,6 +168,7 @@ function OrderCompleteScreen({ order, onClose, onNewOrder }: {
 
 const CartPage = () => {
   const { cart, updateCartQuantity, removeFromCart, checkout, getProductByBarcode, addToCart, products } = useStore();
+  const { profile } = useShopProfile();
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("Cash");
   const [discount, setDiscount] = useState(0);
@@ -169,14 +190,18 @@ const CartPage = () => {
   const total = subtotal + tax - discount;
 
   const handleUPIPayment = async () => {
-    if (!profile.upiId) {
+    if (!profile?.upiId) {
       toast({ title: "UPI ID not configured", description: "Please add your UPI ID in Shop Settings", variant: "destructive" });
       return;
     }
-    const upiLink = generateUPIDeepLink(profile.upiId, total, profile.shopName || "SmartMiniScanKart");
-    const qrUrl = generateQRCode(upiLink);
-    setUpiQRUrl(qrUrl);
-    setUpiQRDialog(true);
+    try {
+      const upiLink = generateUPIDeepLink(profile.upiId, total, profile?.shopName || "SmartMiniScanKart");
+      const qrUrl = generateQRCode(upiLink);
+      setUpiQRUrl(qrUrl);
+      setUpiQRDialog(true);
+    } catch (err) {
+      toast({ title: "QR Generation failed", description: String(err), variant: "destructive" });
+    }
   };
 
   const completeUPIOrder = async () => {
@@ -188,8 +213,18 @@ const CartPage = () => {
       setCheckoutOpen(false);
       setDiscount(0); setCustomerName(""); setCustomerPhone("");
       setCompletedOrder(order);
-    } catch (e) {
-      toast({ title: "Order save failed", description: String(e), variant: "destructive" });
+    } catch (e: unknown) {
+      const errorMsg = e instanceof Error ? e.message : String(e);
+      if (errorMsg.includes("Refresh Token") || errorMsg.includes("Invalid token") || errorMsg.includes("401")) {
+        toast({ 
+          title: "Session expired", 
+          description: "Please log in again", 
+          variant: "destructive" 
+        });
+        navigate("/login");
+      } else {
+        toast({ title: "Order save failed", description: errorMsg, variant: "destructive" });
+      }
     } finally { setProcessing(false); }
   };
 
@@ -201,8 +236,18 @@ const CartPage = () => {
       setCheckoutOpen(false);
       setDiscount(0); setCustomerName(""); setCustomerPhone("");
       setCompletedOrder(order);
-    } catch (e) {
-      toast({ title: "Checkout failed", description: String(e), variant: "destructive" });
+    } catch (e: unknown) {
+      const errorMsg = e instanceof Error ? e.message : String(e);
+      if (errorMsg.includes("Refresh Token") || errorMsg.includes("Invalid token") || errorMsg.includes("401")) {
+        toast({ 
+          title: "Session expired", 
+          description: "Please log in again", 
+          variant: "destructive" 
+        });
+        navigate("/login");
+      } else {
+        toast({ title: "Checkout failed", description: errorMsg, variant: "destructive" });
+      }
     } finally { setProcessing(false); }
   };
 
@@ -416,7 +461,6 @@ const CartPage = () => {
         <DialogContent className="max-w-sm rounded-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <QrCode className="h-5 w-5 text-primary" />
               UPI Payment
             </DialogTitle>
             <DialogDescription>Scan this QR code with Google Pay or any UPI app</DialogDescription>
